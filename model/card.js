@@ -525,11 +525,30 @@ const LIGHT_CSS = `
 .card.light .note { color: #4a5468; }
 .card.light .pairs .k, .card.light .pair .k { color: #8a93a8; }
 .card.light .srow .dps { color: #d9633f; }
+.card.light .stat { background: #fff; border-color: #e4e9f3; }
+.card.light .stat .k { color: #8a93a8; }
+.card.light .stat .v { color: #d99a1f; }
+.card.light .hero-avatar { border-color: #e2c98f; box-shadow: 0 6px 16px rgba(40,60,110,.15); }
+.card.light .hero-text h1 { text-align: left; }
+.card.light .value { color: #d99a1f; }
+.card.light .value small { color: #9aa3b6; }
+.card.light .row { border-color: #e6ebf5; }
+.card.light .primary { color: #2b3040; }
+.card.light .team { color: #8a93a8; }
+.card.light .link { color: #7b8aa6; }
+.card.light .vrow { border-color: #e6ebf5; }
+.card.light .vtitle { color: #2b3040; }
+.card.light .vmeta { color: #5c6579; }
+.card.light .vlink { color: #8a93a8; }
+.card.light .vdur { background: rgba(30,40,60,.55); }
+.card.light .pairs .pair, .card.light .pair { border-color: #e6ebf5; background: #fff; }
+.card.light h2 { color: #8a93a8; }
+.card.light h2::after { background: linear-gradient(90deg, #dfe5f1, transparent); }
 `
 
 export function toHtml (view, avatars = new Map(), weaponIcons = new Map()) {
   const width = Math.max(360, Number(view.width) || Number(config.imageWidth) || 720)
-  const light = view.theme === 'light' || (!view.help && !view.avatarName && /排行|榜|配队|金数/.test(String(view.title || '')))
+  const light = !view.help
   const layout = view.layout || (light ? 'dps' : '')
   const stats = view.stats?.length ? `<div class="stats">${view.stats.map(statHtml).join('')}</div>` : ''
   const sections = (view.sections || []).map(section => sectionHtml(section, avatars, weaponIcons, layout)).join('')
