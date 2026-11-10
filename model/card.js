@@ -287,7 +287,32 @@ function rowHtml (item, avatars) {
   </div>`
 }
 
-function sectionHtml (section, avatars, weaponIcons = new Map()) {
+function stygianRowHtml (item, avatars) {
+  const members = (item.members || []).map(m => {
+    const cons = m.cons > 0 ? `<em>${m.cons}</em>` : ''
+    return `<div class="smember">
+      <span class="sava-wrap">${avatarHtml(m.name, avatars, 'sava')}${cons}</span>
+      <span class="sname">${esc(m.name)}</span>
+    </div>`
+  }).join('')
+  const costLabel = item.costText || item.cost?.label
+  const cost = costLabel ? `<b>${esc(costLabel)}</b><span>金数</span>` : ''
+  const time = item.value ? `<b>${esc(item.value)}</b><span>用时</span>` : ''
+  const star = (item.tags || []).includes('命星') ? '<i class="sstar">命星</i>' : ''
+  const href = item.video || (item.link ? `https://www.bilibili.com/video/${item.link}` : '')
+  const play = href
+    ? `<a class="splay" href="${esc(href)}">▶</a>`
+    : '<span class="splay empty"></span>'
+  return `<div class="srow">
+    <div class="srank ${item.rank <= 3 ? '' : 'n'}">${esc(item.rank)}</div>
+    <div class="smembers">${members}</div>
+    <div class="scost">${cost}${star}</div>
+    <div class="stime">${time}</div>
+    ${play}
+  </div>`
+}
+
+function sectionHtml (section, avatars, weaponIcons = new Map(), layout = '') {
   if (section.type === 'curve') {
     const tiles = section.items.map(item => `<div class="tile">
       <div class="k">${esc(item.label)}${item.sub ? ` ${esc(item.sub)}` : ''}</div>
@@ -297,6 +322,9 @@ function sectionHtml (section, avatars, weaponIcons = new Map()) {
   }
 
   if (section.type === 'rows') {
+    if (layout === 'stygian') {
+      return `<section class="stygian">${section.items.map(item => stygianRowHtml(item, avatars)).join('')}</section>`
+    }
     return `<section>${section.title ? `<h2>${esc(section.title)}</h2>` : ''}${section.items.map(item => rowHtml(item, avatars)).join('')}</section>`
   }
 
@@ -398,10 +426,60 @@ function sectionHtml (section, avatars, weaponIcons = new Map()) {
   return ''
 }
 
+const LIGHT_CSS = `
+.card.light {
+  background: #eef1f8; color: #2b3040;
+  border: none; box-shadow: 0 12px 34px rgba(40, 60, 110, 0.14);
+  padding: 22px 18px 14px;
+}
+.card.light .top { justify-content: center; margin-bottom: 6px; }
+.card.light .brand { color: #8a94ad; font-weight: 600; letter-spacing: 2px; }
+.card.light .brand span { display: none; }
+.card.light .dot { display: none; }
+.card.light h1 { text-align: center; font-size: 26px; color: #232838; font-weight: 800; }
+.card.light .sub { text-align: center; color: #8f98ad; font-size: 12px; margin-top: 4px; }
+.card.light section.stygian { margin-top: 14px; }
+.srow {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border-radius: 16px; padding: 10px 12px; margin-bottom: 8px;
+  box-shadow: 0 4px 14px rgba(40, 60, 110, 0.06);
+}
+.srank { width: 26px; flex: 0 0 26px; text-align: center; font-size: 20px; font-weight: 800; color: #e8503a; }
+.srank.n { color: #b9c0d0; }
+.smembers { flex: 1; display: flex; gap: 10px; min-width: 0; }
+.smember { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 52px; }
+.sava-wrap { position: relative; display: block; width: 40px; height: 40px; }
+.sava {
+  width: 40px; height: 40px; border-radius: 50%; object-fit: cover; object-position: center 18%;
+  background: #e3e8f4; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(40,60,110,.18);
+}
+.sava.fallback { display: flex; align-items: center; justify-content: center; font-size: 16px; color: #6b7690; }
+.sava-wrap em {
+  position: absolute; right: -3px; bottom: -3px; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 8px; background: #5b6b8c; color: #fff; font-style: normal;
+  font-size: 10px; line-height: 16px; text-align: center; font-weight: 700;
+}
+.sname { font-size: 10.5px; color: #4d566d; white-space: nowrap; }
+.scost, .stime { flex: 0 0 52px; text-align: center; }
+.scost b { display: block; font-size: 16px; color: #e0a52e; font-weight: 800; }
+.stime b { display: block; font-size: 16px; color: #3f7fd9; font-weight: 800; }
+.scost span, .stime span { font-size: 9.5px; color: #9aa3b6; }
+.sstar { display: block; font-style: normal; font-size: 9px; color: #57b06a; margin-top: 2px; }
+.splay {
+  flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%;
+  background: #2f8ef0; color: #fff; font-size: 12px; line-height: 30px; text-align: center;
+  text-decoration: none; box-shadow: 0 3px 8px rgba(47,142,240,.35);
+}
+.splay.empty { background: #dfe4ef; box-shadow: none; }
+.card.light .foot { border-top: none; justify-content: center; color: #a2aabb; font-size: 10.5px; margin-top: 10px; }
+.card.light .notes { color: #9aa3b6; text-align: center; }
+.card.light .notes div { display: inline-block; margin: 0 6px; }
+`
+
 export function toHtml (view, avatars = new Map(), weaponIcons = new Map()) {
   const width = Math.max(360, Number(view.width) || Number(config.imageWidth) || 720)
   const stats = view.stats?.length ? `<div class="stats">${view.stats.map(statHtml).join('')}</div>` : ''
-  const sections = (view.sections || []).map(section => sectionHtml(section, avatars, weaponIcons)).join('')
+  const sections = (view.sections || []).map(section => sectionHtml(section, avatars, weaponIcons, view.layout || '')).join('')
   const notes = view.notes?.length
     ? `<div class="notes">${view.notes.map(note => `<div>· ${esc(note)}</div>`).join('')}</div>`
     : ''
@@ -415,8 +493,8 @@ export function toHtml (view, avatars = new Map(), weaponIcons = new Map()) {
     ? `<div class="hero"><img class="hero-avatar" src="${heroAvatar}" alt=""><div class="hero-text"><h1>${esc(view.title)}</h1>${sub}</div></div>`
     : `<h1>${esc(view.title)}</h1>${sub}`
 
-  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><style>${CSS}</style></head>
-<body style="width:${width}px"><div class="card${view.help ? ' help-mode' : ''}">
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><style>${CSS}${view.theme === 'light' ? LIGHT_CSS : ''}</style></head>
+<body style="width:${width}px"><div class="card${view.help ? ' help-mode' : ''}${view.theme === 'light' ? ' light' : ''}">
   <div class="top"><div class="brand">MHYDPS.CN<span>原神 DPS 数据库</span></div><div class="dot"></div></div>
   ${titleBlock}
   ${stats}

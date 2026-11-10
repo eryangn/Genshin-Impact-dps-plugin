@@ -558,6 +558,8 @@ export function stygianView (data, cost = null, options = {}) {
   return {
     title,
     subtitle: `共 ${rows.length} 条 ｜ 用时越短越强${cleanOnly ? ' ｜ 仅绿玩' : ''}`,
+    theme: 'light',
+    layout: 'stygian',
     stats: [],
     sections: [{
       type: 'rows',
@@ -566,9 +568,11 @@ export function stygianView (data, cost = null, options = {}) {
         rank: index + 1,
         value: `${item.speed}s`,
         cost: gold(item.cost, item.limitCost),
+        costText: `${item.cost}金`,
         team: `${item.ver ? `v${item.ver} ` : ''}${teamNames(item)}`,
         members: item.members,
         ver: item.ver,
+        video: item.video || '',
         tags: cleanOnly ? [] : teamTags(item),
         link: videoLink(item, index)
       }))
