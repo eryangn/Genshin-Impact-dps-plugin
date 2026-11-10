@@ -3,8 +3,8 @@
  * 修改后保存，并发送「#dps更新」即可生效（无需重启）
  */
 export const config = {
-  /** 数据缓存时间（分钟），到期后下次查询自动重新拉取 */
-  cacheMinutes: 30,
+  /** 数据缓存时间（分钟），到期后下次查询自动重新拉取；默认一天 */
+  cacheMinutes: 1440,
 
   /** 是否输出图片卡片（需要 Yunzai 环境里装有 puppeteer；渲染失败会自动回退为文字） */
   image: true,

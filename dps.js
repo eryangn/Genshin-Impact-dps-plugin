@@ -90,6 +90,15 @@ export class Mhydps extends plugin {
         { reg: `${P}[\\s:：]*(.+)$`, fnc: 'character' }
       ]
     })
+
+    // 启动后预热本地缓存；之后每天自动更新一次
+    getData().catch(() => {})
+    getStygian().catch(() => {})
+    const timer = setInterval(() => {
+      getData(true).catch(() => {})
+      getStygian(true).catch(() => {})
+    }, 24 * 60 * 60 * 1000)
+    timer.unref?.()
   }
 
   get text () {

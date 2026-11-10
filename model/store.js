@@ -1,11 +1,33 @@
 /** 数据缓存与聚合 */
+import fs from 'node:fs'
 import { fetchTeams, fetchStygian } from './api.js'
 import { canonicalName } from './characters.js'
 import { config } from '../config/config.js'
 
+const CACHE_DIR = new URL('../cache/', import.meta.url)
+
 const caches = {
   teams: { at: 0, data: null, promise: null },
   stygian: { at: 0, data: null, promise: null }
+}
+
+/** 读取本地缓存文件（{ at, rows }） */
+async function readRaw (name) {
+  try {
+    const text = await fs.promises.readFile(new URL(name, CACHE_DIR), 'utf8')
+    const parsed = JSON.parse(text)
+    return Array.isArray(parsed?.rows) && parsed.rows.length ? parsed : null
+  } catch (err) {
+    return null
+  }
+}
+
+/** 把原始接口数据写到本地，供下次启动秒开 */
+async function writeRaw (name, rows) {
+  try {
+    await fs.promises.mkdir(CACHE_DIR, { recursive: true })
+    await fs.promises.writeFile(new URL(name, CACHE_DIR), JSON.stringify({ at: Date.now(), rows }))
+  } catch (err) { /* 写失败不影响查询 */ }
 }
 
 function ttl () {
@@ -95,8 +117,8 @@ function buildIndex (teams) {
   }
 }
 
-async function loadTeams () {
-  const rows = await fetchTeams()
+async function loadTeams (rows) {
+  if (!rows) rows = await fetchTeams()
   const normalized = rows
     .filter(row => !config.onlyConfirmed || row?.confirm !== false)
     .map(normalizeTeam)
@@ -131,11 +153,28 @@ async function loadTeams () {
  */
 export async function getData (force = false) {
   const cache = caches.teams
+
+  // 启动后先用本地缓存秒开，再按 TTL 后台刷新
+  if (!force && !cache.data) {
+    const raw = await readRaw('teams.json')
+    if (raw) {
+      try {
+        cache.data = await loadTeams(raw.rows)
+        cache.at = Number(raw.at) || 0
+      } catch (err) { /* 缓存损坏就忽略 */ }
+    }
+  }
+
   const fresh = cache.data && Date.now() - cache.at < ttl()
   if (!force && fresh) return cache.data
   if (cache.promise) return cache.promise
 
-  cache.promise = loadTeams()
+  cache.promise = (async () => {
+    const rows = await fetchTeams()
+    const data = await loadTeams(rows)
+    writeRaw('teams.json', rows)
+    return data
+  })()
     .then(data => {
       caches.teams = { at: Date.now(), data, promise: null }
       return data
@@ -153,20 +192,39 @@ export async function getData (force = false) {
   return cache.promise
 }
 
+function buildStygian (rows) {
+  const list = rows
+    .filter(row => !config.onlyConfirmed || row?.confirm !== false)
+    .map(normalizeStygian)
+    .filter(item => item.speed > 0 && item.members.length > 0)
+    .sort((a, b) => a.speed - b.speed)
+  return { list, fetchedAt: Date.now() }
+}
+
 /** 危战（teams2）数据，按用时升序 */
 export async function getStygian (force = false) {
   const cache = caches.stygian
+
+  if (!force && !cache.data) {
+    const raw = await readRaw('stygian.json')
+    if (raw) {
+      try {
+        cache.data = buildStygian(raw.rows)
+        cache.at = Number(raw.at) || 0
+      } catch (err) { /* 忽略损坏缓存 */ }
+    }
+  }
+
   if (!force && cache.data && Date.now() - cache.at < ttl()) return cache.data
   if (cache.promise) return cache.promise
 
-  cache.promise = fetchStygian()
-    .then(rows => {
-      const list = rows
-        .filter(row => !config.onlyConfirmed || row?.confirm !== false)
-        .map(normalizeStygian)
-        .filter(item => item.speed > 0 && item.members.length > 0)
-        .sort((a, b) => a.speed - b.speed)
-      const data = { list, fetchedAt: Date.now() }
+  cache.promise = (async () => {
+    const rows = await fetchStygian()
+    const data = buildStygian(rows)
+    writeRaw('stygian.json', rows)
+    return data
+  })()
+    .then(data => {
       caches.stygian = { at: Date.now(), data, promise: null }
       return data
     })
