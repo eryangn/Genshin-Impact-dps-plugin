@@ -293,6 +293,13 @@ try {
   STAR_ICON = `<img src="data:image/png;base64,${starBuffer.toString('base64')}" alt="命星">`
 } catch (err) { /* 没有图标就留空 */ }
 
+
+
+function starBadge (tags) {
+  if (!Array.isArray(tags) || !tags.includes('命星')) return ''
+  return `<span class="sstar" title="命星">${STAR_ICON}</span>`
+}
+
 function stygianRowHtml (item, avatars) {
   const members = (item.members || []).map(m => {
     const cons = m.cons > 0 ? `<em>${m.cons}</em>` : ''
@@ -301,7 +308,7 @@ function stygianRowHtml (item, avatars) {
       <span class="sname">${esc(m.name)}</span>
     </div>`
   }).join('')
-  const star = (item.tags || []).includes('命星') ? `<span class="sstar" title="命星">${STAR_ICON}</span>` : ''
+  const star = starBadge(item.tags)
   const costLabel = item.costText || item.cost?.label
   const cost = costLabel ? `<b>${esc(costLabel)}${star}</b><span>金数</span>` : ''
   const time = item.value ? `<b>${esc(item.value)}</b><span>用时</span>` : ''
@@ -331,8 +338,9 @@ function dpsRowHtml (item, avatars) {
         <span class="sava-wrap">${avatarHtml(item.name, avatars, 'sava')}</span>
         <span class="sname">${esc(item.name)}</span>
       </div>`
+  const star = starBadge(item.tags)
   const costLabel = item.costText || item.cost?.label
-  const cost = costLabel ? `<b>${esc(costLabel)}</b><span>金数</span>` : ''
+  const cost = costLabel ? `<b>${esc(costLabel)}${star}</b><span>金数</span>` : ''
   const value = item.value ? `<b class="dps">${esc(item.value)}</b><span>DPS</span>` : ''
   const href = item.video || (item.link ? `https://www.bilibili.com/video/${item.link}` : '')
   const play = href
@@ -374,7 +382,7 @@ function sectionHtml (section, avatars, weaponIcons = new Map(), layout = '') {
 
   if (section.type === 'tiers') {
     const rows = section.items.map(item => `<div class="tier">
-      <div class="tier-cost">${costPill(item.cost)}</div>
+      <div class="tier-cost">${costPill(item.cost)}${starBadge(item.tags)}</div>
       <div class="tier-dps">${esc(item.value)}</div>
       <div class="tier-team"><div class="members">${membersHtml(item.members, avatars)}</div></div>
       ${item.count ? `<div class="tier-count">${esc(item.count)}${item.median ? `<span>中位 ${esc(item.median)}</span>` : ''}</div>` : ''}

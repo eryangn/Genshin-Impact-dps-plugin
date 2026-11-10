@@ -174,7 +174,8 @@ export function characterView (data, name, options = {}) {
           cost: gold(row.cost, row.limitCost),
           value: num(row.dps),
           members: row.members,
-          team: teamNames(row)
+          team: teamNames(row),
+          tags: cleanOnly ? [] : teamTags(row)
         }
       })
     })
