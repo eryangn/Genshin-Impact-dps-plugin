@@ -1,6 +1,6 @@
 ﻿{
   "name": "genshin-impact-dps-plugin",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "description": "鍘熺 DPS 鏁版嵁搴擄紙mhydps.cn锛夋煡璇㈡彃浠讹細瑙掕壊 / 鍚勯噾鏁伴厤闃?/ 鎺掕 / 瀵规瘮 / 鍗辨垬 / 姝﹀櫒缁冨害 / 閰嶉槦瑙嗛",
   "type": "module",
   "main": "dps.js",
@@ -25,6 +25,7 @@
     "install.sh"
   ]
 }
+
 
 
 
