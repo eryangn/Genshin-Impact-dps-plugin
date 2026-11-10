@@ -51,6 +51,7 @@ function normalizeStygian (row) {
     ver: String(row?.ver || ''),
     boss: row?.boss ?? null,
     clean: !!row?.clean,
+    lvl: !!row?.lvl,
     tags: Array.isArray(row?.tags) ? row.tags.filter(Boolean).map(String) : [],
     video: String(row?.video_url || '')
   }

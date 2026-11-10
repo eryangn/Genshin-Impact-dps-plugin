@@ -37,7 +37,7 @@ const TEAM_FIELDS = [
 
 const STYGIAN_FIELDS = [
   'id', 'members', 'cost', 'limitcost', 'normalcost',
-  'confirm', 'video_url', 'speed', 'ver', 'boss'
+  'confirm', 'video_url', 'speed', 'ver', 'boss', 'lvl'
 ].join(',')
 
 /** 带超时 / 重试的 HTTPS GET，返回解析后的 JSON */

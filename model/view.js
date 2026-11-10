@@ -38,6 +38,7 @@ export function isClean (team) {
 export function teamTags (team) {
   const tags = []
   if (isClean(team)) tags.push('绿玩')
+  if (team?.lvl) tags.push('命星')
   if (Array.isArray(team?.tags) && team.tags.includes('宏')) tags.push('宏')
   return tags
 }
