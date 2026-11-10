@@ -287,7 +287,11 @@ function rowHtml (item, avatars) {
   </div>`
 }
 
-const STAR_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#57b06a"/><path d="M12 5.2l1.9 4.4 4.4 1.9-4.4 1.7L12 17.6l-1.9-4.4L5.7 11.5l4.4-1.9z" fill="#fff"/></svg>'
+let STAR_ICON = ''
+try {
+  const starBuffer = fs.readFileSync(new URL('../resources/star.png', import.meta.url))
+  STAR_ICON = `<img src="data:image/png;base64,${starBuffer.toString('base64')}" alt="命星">`
+} catch (err) { /* 没有图标就留空 */ }
 
 function stygianRowHtml (item, avatars) {
   const members = (item.members || []).map(m => {
@@ -297,10 +301,10 @@ function stygianRowHtml (item, avatars) {
       <span class="sname">${esc(m.name)}</span>
     </div>`
   }).join('')
-  const costLabel = item.costText || item.cost?.label
-  const cost = costLabel ? `<b>${esc(costLabel)}</b><span>金数</span>` : ''
-  const time = item.value ? `<b>${esc(item.value)}</b><span>用时</span>` : ''
   const star = (item.tags || []).includes('命星') ? `<span class="sstar" title="命星">${STAR_ICON}</span>` : ''
+  const costLabel = item.costText || item.cost?.label
+  const cost = costLabel ? `<b>${esc(costLabel)}${star}</b><span>金数</span>` : ''
+  const time = item.value ? `<b>${esc(item.value)}</b><span>用时</span>` : ''
   const href = item.video || (item.link ? `https://www.bilibili.com/video/${item.link}` : '')
   const play = href
     ? `<a class="splay" href="${esc(href)}">▶</a>`
@@ -308,7 +312,7 @@ function stygianRowHtml (item, avatars) {
   return `<div class="srow">
     <div class="srank ${item.rank <= 3 ? '' : 'n'}">${esc(item.rank)}</div>
     <div class="smembers">${members}</div>
-    <div class="scost">${cost}${star}</div>
+    <div class="scost">${cost}</div>
     <div class="stime">${time}</div>
     ${play}
   </div>`
@@ -466,8 +470,8 @@ const LIGHT_CSS = `
 .scost b { display: block; font-size: 16px; color: #e0a52e; font-weight: 800; }
 .stime b { display: block; font-size: 16px; color: #3f7fd9; font-weight: 800; }
 .scost span, .stime span { font-size: 9.5px; color: #9aa3b6; }
-.sstar { display: inline-flex; width: 15px; height: 15px; margin-top: 3px; vertical-align: middle; }
-.sstar svg { width: 15px; height: 15px; display: block; }
+.sstar { display: inline-flex; width: 16px; height: 16px; margin-left: 3px; vertical-align: -3px; }
+.sstar img { width: 16px; height: 16px; display: block; object-fit: contain; }
 .splay {
   flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%;
   background: #2f8ef0; color: #fff; font-size: 12px; line-height: 30px; text-align: center;
