@@ -302,10 +302,12 @@ function starBadge (tags) {
 
 
 
+const LEAF_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19C13 19 19 13 19 5 11 5 5 11 5 19z" fill="#3f9b5c"/></svg>'
+
 function tagBadges (tags) {
   const list = Array.isArray(tags) ? tags : []
   const out = []
-  if (list.includes('绿玩')) out.push('<i class="stag green">绿玩</i>')
+  if (list.includes('绿玩')) out.push(`<i class="stag green">${LEAF_ICON}绿玩</i>`)
   if (list.includes('宏')) out.push('<i class="stag red">宏</i>')
   return out.join('')
 }
@@ -524,6 +526,7 @@ const LIGHT_CSS = `
 .sstar img { width: 16px; height: 16px; display: block; object-fit: contain; }
 .stag { display: inline-block; font-style: normal; font-size: 9px; line-height: 13px; padding: 0 4px; border-radius: 4px; margin: 2px 2px 0 0; }
 .stag.green { color: #3f9b5c; background: #e3f6e8; }
+.stag svg { width: 9px; height: 9px; vertical-align: -1px; margin-right: 2px; }
 .stag.red { color: #c94f4f; background: #fdeaea; }
 .splay {
   flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%;
