@@ -197,6 +197,77 @@ export function characterView (data, name, options = {}) {
   }
 }
 
+/** 角色各金数排名（#dps 角色 多少金 / #dps角色 8金） */
+export function characterCostRankView (data, name, options = {}) {
+  const cleanOnly = options.cleanOnly ?? false
+  const onlyCost = options.cost ?? null
+  const teams = filterTeams(data.byChar.get(name) || [], cleanOnly)
+
+  if (!teams.length) {
+    return emptyView(`${charTitle(name)} · 金数排行`, '暂无该角色的配队数据。', data)
+  }
+
+  const perCost = new Map()
+  for (const team of teams) {
+    const current = perCost.get(team.cost)
+    if (!current || team.dps > current.dps) perCost.set(team.cost, team)
+  }
+
+  let costs = [...perCost.keys()].sort((a, b) => a - b)
+  if (onlyCost !== null) costs = costs.filter(c => c === onlyCost)
+  else costs = costs.filter(c => c <= 12 || c === 48)
+
+  if (!costs.length) {
+    return emptyView(
+      `${charTitle(name)} · ${onlyCost !== null ? gold(onlyCost).label : '金数排行'}`,
+      `${name} 在该金数下暂无收录。`,
+      data,
+      [`用 #dps ${name} 多少金 查看全部档位`]
+    )
+  }
+
+  const items = costs.map(cost => {
+    const team = perCost.get(cost)
+    const pool = filterTeams(data.byCost.get(cost) || [], cleanOnly)
+    const rank = pool.indexOf(team) + 1
+    return { cost, team, rank, total: pool.length }
+  })
+
+  const best = items.reduce((a, b) => (b.team.dps > a.team.dps ? b : a), items[0])
+
+  return {
+    title: onlyCost === null
+      ? `${charTitle(name)} · 金数排行`
+      : `${charTitle(name)} · ${gold(onlyCost).label} 排名`,
+    subtitle: onlyCost === null
+      ? `共 ${items.length} 个档位 ｜ 排名为该角色在该金数下的全站名次`
+      : `${name} 在 ${gold(onlyCost).label} 下的最佳队伍与全站名次`,
+    avatarName: name,
+    stats: [
+      { label: '最高DPS档位', value: gold(best.cost).label },
+      { label: '该档排名', value: best.rank ? `#${best.rank}/${best.total}` : '—' },
+      { label: '该档DPS', value: num(best.team.dps) }
+    ],
+    sections: [{
+      type: 'table',
+      head: ['金数', '最佳DPS', '全站排名', '队伍'],
+      items: items.map(item => ({
+        cells: [
+          gold(item.cost).label,
+          num(item.team.dps),
+          item.rank ? `#${item.rank}/${item.total}` : '—',
+          teamNames(item.team)
+        ]
+      }))
+    }],
+    notes: [
+      '排名 = 该角色在该金数下的最佳队伍，在全站同金数队伍中的名次',
+      '金数 = 限定金 + 常驻金，满配 48 金'
+    ],
+    footer: footer(data)
+  }
+}
+
 /** 全站各金数统计 */
 export function costTableView (data, options = {}) {
   const cleanOnly = options.cleanOnly ?? false
@@ -427,24 +498,32 @@ export function compareView (data, nameA, nameB, options = {}) {
 export function teamQueryView (data, names, options = {}) {
   const cleanOnly = options.cleanOnly ?? false
   const pool = filterTeams(data.teams, cleanOnly)
-  const matched = pool.filter(team => names.every(name => team.members.some(m => m.name === name)))
-  const title = `配队查询：${names.join(' + ')}`
+  const maxCost = Number.isFinite(Number(options.maxCost)) ? Number(options.maxCost) : null
+  const pageSize = Math.max(1, Number(options.pageSize) || 20)
+  const page = Math.max(1, Number(options.page) || 1)
+  const matched = pool
+    .filter(team => names.every(name => team.members.some(m => m.name === name)))
+    .filter(team => maxCost === null || team.cost <= maxCost)
+    .sort((a, b) => b.dps - a.dps)
+  const pages = Math.max(1, Math.ceil(matched.length / pageSize))
+  const current = Math.min(page, pages)
+  const slice = matched.slice((current - 1) * pageSize, current * pageSize)
+  const title = `配队查询：${names.join(' + ')}${maxCost === null ? '' : ` · ≤${maxCost}金`}`
 
   if (!matched.length) {
-    return emptyView(title, '没有收录同时包含这些角色的配队。', data, ['可以减少角色数量后再试'])
+    return emptyView(title, '没有收录同时包含这些角色的配队。', data, ['可以减少角色数量或放宽金数'])
   }
 
-  const limit = Math.max(1, Number(config.listLimit) || 30)
   return {
     title,
-    subtitle: `共 ${matched.length} 队`,
+    subtitle: `共 ${matched.length} 队 ｜ 第 ${current}/${pages} 页`,
     stats: [],
     sections: [{
       type: 'rows',
       title: '',
-      items: matched.slice(0, limit).map((team, index) => rowFromTeam(team, index, true, cleanOnly))
+      items: slice.map((team, index) => rowFromTeam(team, (current - 1) * pageSize + index, true, cleanOnly))
     }],
-    notes: [],
+    notes: pages > 1 ? [`翻页：#dps配队 ${names.join(' ')} ${maxCost === null ? '' : `${maxCost}金 `}${current + 1}`.trim()] : [],
     footer: footer(data)
   }
 }
@@ -453,11 +532,25 @@ export function teamQueryView (data, names, options = {}) {
 export function stygianView (data, cost = null, options = {}) {
   const cleanOnly = options.cleanOnly ?? false
   const pool = filterTeams(data.list, cleanOnly)
-  const rows = cost === null ? pool : pool.filter(item => item.cost === cost)
-  const title = cost === null ? '危战竞速榜' : `危战竞速榜 · ${goldText(cost)}`
+  const maxCost = Number.isFinite(Number(options.maxCost)) ? Number(options.maxCost) : null
+  const version = options.version ? String(options.version) : ''
+  const boss = options.boss != null ? String(options.boss) : ''
+  const rows = pool.filter(item => {
+    if (cost !== null && item.cost !== cost) return false
+    if (maxCost !== null && item.cost > maxCost) return false
+    if (version && String(item.ver) !== version) return false
+    if (boss && String(item.boss ?? '') !== boss) return false
+    return true
+  })
+  const extra = [
+    version ? `v${version}` : '',
+    boss ? `BOSS ${boss}` : '',
+    maxCost !== null ? `≤${maxCost}金` : ''
+  ].filter(Boolean).join(' · ')
+  const title = `危战竞速榜${cost === null ? '' : ` · ${goldText(cost)}`}${extra ? ` · ${extra}` : ''}`
 
   if (!rows.length) {
-    return emptyView(title, '暂无符合条件的竞速记录。', data)
+    return emptyView(title, '暂无符合条件的竞速记录。', data, ['可以去掉 BOSS 或金数限制再试'])
   }
 
   const limit = Math.max(1, Number(config.listLimit) || 30)
@@ -572,9 +665,11 @@ export function helpView () {
       title: '角色查询',
       color: '#ff8a5c',
       items: [
-        { icon: 'user', cmd: '#dps 玛薇卡', desc: '角色总览 + 各金数最佳配队' },
-        { icon: 'coin', cmd: '#dps 玛薇卡 4', desc: '该角色在 4 金时的队伍' },
-        { icon: 'swap', cmd: '#dps金数 玛薇卡 4', desc: '同上，另一种写法' }
+        { icon: 'user', cmd: '#dps玛薇卡', desc: '角色总览 + 各金数最佳配队' },
+        { icon: 'coin', cmd: '#dps玛薇卡4', desc: '该角色在 4 金时的队伍' },
+        { icon: 'trophy', cmd: '#dps玛薇卡多少金', desc: '该角色各金数的 DPS 与全站排名' },
+        { icon: 'hash', cmd: '#dps玛薇卡8金', desc: '该角色在 8 金的排名与最佳队伍' },
+        { icon: 'swap', cmd: '#dps金数玛薇卡4', desc: '同上，另一种写法' }
       ]
     },
     {
@@ -594,10 +689,11 @@ export function helpView () {
       title: '进阶',
       color: '#8ab4ff',
       items: [
-        { icon: 'scale', cmd: '#dps对比 玛薇卡 阿蕾奇诺', desc: '两名角色逐金数对比' },
-        { icon: 'users', cmd: '#dps队伍 玛薇卡 班尼特', desc: '同时包含这些角色的队伍' },
-        { icon: 'play', cmd: '#dps 甘雨视频', desc: '该角色带视频的配队，可加 #序号' },
-        { icon: 'download', cmd: '#dps视频下载 甘雨 #2', desc: '下载并发送视频文件（仅主人）' },
+        { icon: 'scale', cmd: '#dps对比玛薇卡阿蕾奇诺', desc: '两名角色逐金数对比' },
+        { icon: 'users', cmd: '#dps队伍玛薇卡班尼特', desc: '同时包含这些角色的队伍' },
+        { icon: 'play', cmd: '#dps甘雨视频', desc: '该角色带视频的配队，可加 #序号' },
+        { icon: 'play', cmd: '#dps甘雨8金视频', desc: '只看该角色 8 金带视频的配队' },
+        { icon: 'download', cmd: '#dps甘雨8金视频下载', desc: '下载并发送指定视频（仅主人，和视频查询同一个功能）' },
         { icon: 'sword', cmd: '#dps武器 <UID>', desc: '查账号角色的武器/精炼/等级' },
         { icon: 'alert', cmd: '#dps危战', desc: '危战竞速榜，可加金数' },
         { icon: 'hash', cmd: '#dps危战金数', desc: '危战按金数分档排行' }
@@ -608,7 +704,7 @@ export function helpView () {
       color: '#b28cff',
       items: [
         { icon: 'refresh', cmd: '#dps更新', desc: '刷新数据缓存（仅主人）' },
-        { icon: 'sliders', cmd: '#dps精度 2', desc: '调整图片渲染精度（仅主人）' },
+        { icon: 'sliders', cmd: '#dps精度2', desc: '调整图片渲染精度（仅主人）' },
         { icon: 'download', cmd: '#dps插件更新', desc: '更新插件本体（仅主人，重启生效）' },
         { icon: 'link', cmd: '#dps链接', desc: '官网地址' }
       ]
@@ -709,5 +805,67 @@ export function linkView () {
     }],
     notes: [],
     footer: null
+  }
+}
+
+/** 危战 BOSS / 版本一览 */
+export function stygianListView (data, version = '') {
+  const rows = (data.list || []).filter(item => !version || String(item.ver) === String(version))
+  if (!rows.length) {
+    return emptyView('危战列表', '暂无危战数据。', data)
+  }
+
+  const groups = new Map()
+  for (const item of rows) {
+    const ver = String(item.ver || '未知')
+    if (!groups.has(ver)) groups.set(ver, { bosses: new Set(), count: 0 })
+    const group = groups.get(ver)
+    group.bosses.add(String(item.boss ?? '未知'))
+    group.count += 1
+  }
+
+  const versions = [...groups.entries()].sort((a, b) => b[0].localeCompare(a[0], undefined, { numeric: true }))
+  return {
+    title: version ? `危战列表 · v${version}` : '危战列表',
+    subtitle: `${versions.length} 个版本 ｜ 共 ${rows.length} 条记录`,
+    stats: [],
+    sections: [{
+      type: 'table',
+      head: ['版本', 'BOSS 数', '记录数', '查询'],
+      items: versions.map(([ver, group]) => ({
+        cells: [
+          `v${ver}`,
+          String(group.bosses.size),
+          String(group.count),
+          `#${ver}危战第一间`
+        ]
+      }))
+    }],
+    notes: [
+      '按版本 + 第几间查询：#7.1危战第二间',
+      '只看低金：#dps危战 低金'
+    ],
+    footer: footer(data)
+  }
+}
+
+/** 按名次取榜单视频 */
+export function videoRankView (data, rank) {
+  const index = Math.max(1, Number(rank) || 1) - 1
+  const team = (data.teams || [])[index]
+  if (!team) return null
+  return {
+    title: `第 ${index + 1} 名视频`,
+    subtitle: `${team.members.map(m => m.name).join(' + ')} ｜ ${Math.round(team.dps)}`,
+    stats: [],
+    sections: [{
+      type: 'note',
+      lines: [
+        `DPS：${Math.round(team.dps)}`,
+        team.video ? `视频：${team.video}` : '这条没有收录视频链接'
+      ]
+    }],
+    notes: [],
+    footer: footer(data)
   }
 }

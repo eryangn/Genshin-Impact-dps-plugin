@@ -1,12 +1,21 @@
 /** 配队视频：解析 B 站链接并拉取标题 / 封面 / 时长（带缓存） */
 import https from 'node:https'
 import zlib from 'node:zlib'
+import { randomUUID } from 'node:crypto'
+import { config } from '../config/config.js'
 
 const CACHE_TTL = 60 * 60 * 1000
 const cache = new Map()
 const pending = new Map()
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+
+// B 站接口对纯 IP 请求会返回 412：始终附带 buvid3，填了 biliCookie 再叠加登录态
+const BILI_COOKIE = [
+  String(config.biliCookie || '').trim(),
+  `buvid3=${randomUUID()}infoc`,
+  `b_nut=${Math.floor(Date.now() / 1000)}`
+].filter(Boolean).join('; ')
 
 /** 解析站点里的 video_url */
 export function parseVideoUrl (raw) {
@@ -31,6 +40,8 @@ function request (url, { json = false, timeout = 10000 } = {}) {
       headers: {
         'User-Agent': UA,
         Referer: 'https://www.bilibili.com/',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        Cookie: BILI_COOKIE,
         Accept: json ? 'application/json' : 'image/webp,image/jpeg,image/*',
         'Accept-Encoding': json ? 'gzip, deflate' : 'identity'
       }

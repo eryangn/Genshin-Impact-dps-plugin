@@ -4,9 +4,16 @@ import zlib from 'node:zlib'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { parseVideoUrl } from './videos.js'
+import { config } from '../config/config.js'
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+const BILI_COOKIE = [
+  String(config.biliCookie || '').trim(),
+  `buvid3=${randomUUID()}infoc`,
+  `b_nut=${Math.floor(Date.now() / 1000)}`
+].filter(Boolean).join('; ')
 
 function getJson (url, timeout = 15000) {
   return new Promise((resolve, reject) => {
@@ -16,6 +23,8 @@ function getJson (url, timeout = 15000) {
       headers: {
         'User-Agent': UA,
         Referer: 'https://www.bilibili.com/',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        Cookie: BILI_COOKIE,
         Accept: 'application/json',
         'Accept-Encoding': 'gzip, deflate'
       }
@@ -52,6 +61,8 @@ function downloadToFile (url, file, timeout = 120000) {
       headers: {
         'User-Agent': UA,
         Referer: 'https://www.bilibili.com/',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        Cookie: BILI_COOKIE,
         Accept: '*/*',
         'Accept-Encoding': 'identity'
       }

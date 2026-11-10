@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
+import fs from 'node:fs'
 import { getData, getStygian } from './model/store.js'
 import { resolveCharacter } from './model/characters.js'
 import * as V from './model/view.js'
@@ -57,6 +58,8 @@ export class Mhydps extends plugin {
         { reg: `${P}(?:更新|刷新数据?)\\s*$`, fnc: 'update', permission: 'master' },
         { reg: `${P}插件更新\\s*$`, fnc: 'pluginUpdate', permission: 'master' },
         { reg: `${P}(?:渲染)?精度[\\s:：]*(.*)$`, fnc: 'quality', permission: 'master' },
+        { reg: `${P}[\\s:：]*(.+?)(?:的)?(?:多少金|几金|金数排行|金数排名)${FLAG}\\s*$`, fnc: 'characterCostRank' },
+        { reg: `${P}[\\s:：]*(.+?)[\\s:：]*(\\d{1,2}|满配|满金)金${FLAG}\\s*$`, fnc: 'characterCostSingle' },
         { reg: `${P}(?:金数表|金表|金数统计)${FLAG}\\s*$`, fnc: 'costTable' },
         { reg: `${P}(?:各金数最高|金数最高|最高金数)${FLAG}\\s*$`, fnc: 'costTable' },
         { reg: `${P}(?:各金数|金数配队|配队表)${FLAG}\\s*$`, fnc: 'goldTeams' },
@@ -65,17 +68,22 @@ export class Mhydps extends plugin {
         { reg: `${P}(?:绿玩|无宏|纯净)(?:角色)?榜(?:[\\s:：]*${COST})?${FLAG}\\s*$`, fnc: 'cleanRank' },
         { reg: `${P}(?:角色榜|主C榜|角色排行)(?:[\\s:：]*${COST})?${FLAG}\\s*$`, fnc: 'characterRank' },
         { reg: `${P}(?:排行|榜单|排名)(?:[\\s:：]*${COST})?${FLAG}\\s*$`, fnc: 'rank' },
-        { reg: `${P}队伍[\\s:：]*(.+)$`, fnc: 'team' },
+        { reg: `${P}(?:队伍|配队)[\\s:：]*(.+)$`, fnc: 'team' },
+        { reg: `${P}危战列表(?:[\\s:：]*(\\d+(?:\\.\\d+)?))?${FLAG}\\s*$`, fnc: 'stygianList' },
+        { reg: `${P}(\\d+(?:\\.\\d+)?)危战第?([一二三四五1-5])间${FLAG}\\s*$`, fnc: 'stygianRoom' },
+        { reg: `${P}危战[\\s:：]*低金${FLAG}\\s*$`, fnc: 'stygianLow' },
         { reg: `${P}危战(?:各)?金数(?:表|排行|最高)?(?:[\\s:：]*${COST})?${FLAG}\\s*$`, fnc: 'stygianCost' },
         { reg: `${P}危战(?:[\\s:：]*${COST})?${FLAG}\\s*$`, fnc: 'stygian' },
+        { reg: `${P}危战[\\s:：]*(\\d{1,4})${FLAG}\\s*$`, fnc: 'stygianBoss' },
         { reg: `${P}(?:武器|练度)[\\s:：]*(\\d{6,12})?(?:[\\s:：]+(.+))?${FLAG}\\s*$`, fnc: 'weapon' },
-        { reg: `${P}.*视频下载.*$`, fnc: 'videoDownload' },
+        { reg: `${P}.*视频.*下载.*${FLAG}\\s*$`, fnc: 'video' },
         { reg: `${P}.*视频.*(?:#|第)\\d{1,2}号?${FLAG}\\s*$`, fnc: 'video' },
         { reg: `${P}.*视频.*\\d{1,2}号${FLAG}\\s*$`, fnc: 'video' },
         { reg: `${P}[\\s:：]*(.+?)(?:的)?视频[\\s:：]*(?:#|第)(\\d{1,2})号?${FLAG}\\s*$`, fnc: 'video' },
         { reg: `${P}视频[\\s:：]*(.+?)[\\s:：]*(?:#|第)(\\d{1,2})号?${FLAG}\\s*$`, fnc: 'video' },
         { reg: `${P}[\\s:：]*(.+?)(?:的)?视频[\\s:：]*(\\d{1,2})号${FLAG}\\s*$`, fnc: 'video' },
         { reg: `${P}视频[\\s:：]*(.+?)[\\s:：]*(\\d{1,2})号${FLAG}\\s*$`, fnc: 'video' },
+        { reg: `${P}视频[\\s:：]*(?:第)?(\\d{1,3})(?:名|号)?${FLAG}\\s*$`, fnc: 'videoRank' },
         { reg: `${P}视频[\\s:：]*(.*)$`, fnc: 'video' },
         { reg: `${P}[\\s:：]*(.+?)(?:的)?视频(?:[\\s:：]*${COST})?${FLAG}\\s*$`, fnc: 'video' },
         { reg: `${P}(?:链接|官网|网址)${FLAG}\\s*$`, fnc: 'link' },
@@ -302,6 +310,62 @@ export class Mhydps extends plugin {
     })
   }
 
+  /** #dps 角色 多少金：查看该角色各金数的 DPS 与全站排名 */
+  async characterCostRank () {
+    return this.run(async () => {
+      const { text, cleanOnly, forceText } = this.info
+      const raw = (text.match(new RegExp(`${P}[\\s:：]*(.+?)(?:的)?(?:多少金|几金|金数排行|金数排名)\\s*$`, 'i'))?.[1] || '').trim()
+      if (!raw) return this.reply('用法：#dps 玛薇卡 多少金')
+
+      const data = await getData()
+      const name = resolveCharacter(data, raw)
+      if (!name) {
+        return this.reply([
+          `没有识别到角色「${raw}」`,
+          '支持本名 / 别名（如 雷神、龟、爷）',
+          '用 #dps角色榜 查看已收录的角色'
+        ].join('\n'))
+      }
+
+      return this.send(V.characterCostRankView(data, name, { cleanOnly }), forceText)
+    })
+  }
+
+  /** #dps 角色 8金：该角色在指定金数的排名 */
+  async characterCostSingle () {
+    return this.run(async () => {
+      const { text, cleanOnly, forceText } = this.info
+      const matched = text.match(new RegExp(`${P}[\\s:：]*(.+?)[\\s:：]*(\\d{1,2}|满配|满金)金\\s*$`, 'i'))
+      if (!matched) return this.reply('用法：#dps 雷神 8金')
+
+      const raw = matched[1].trim()
+      const cost = this.parseCost(matched[2])
+      if (cost === null) return this.reply('金数范围 0 ~ 48，例如：#dps 雷神 8金')
+
+      const data = await getData()
+      const name = resolveCharacter(data, raw)
+      if (!name) return this.reply(`没有识别到角色「${raw}」`)
+
+      return this.send(V.characterCostRankView(data, name, { cost, cleanOnly }), forceText)
+    })
+  }
+
+  /** 解析「角色 + 金数」，金数可无空格、可不带「金」 */
+  resolveNameCost (data, raw) {
+    const input = String(raw ?? '').trim()
+    let name = resolveCharacter(data, input)
+    if (name) return { name, cost: null }
+
+    const matched = input.match(/^(.*?)[\s:：]*(\d{1,2}|满配|满金)金?$/)
+    if (matched && matched[1].trim()) {
+      const cost = this.parseCost(matched[2])
+      const found = resolveCharacter(data, matched[1].trim())
+      if (found && cost !== null) return { name: found, cost }
+    }
+
+    return { name: null, cost: null }
+  }
+
   /** #dps玛薇卡 / #dps 玛薇卡 4 */
   async character () {
     return this.run(async () => {
@@ -324,7 +388,10 @@ export class Mhydps extends plugin {
 
       // 允许「神里 绫华」这种被空格分开的角色名：先按原样匹配，再按去空格匹配
       const compact = raw.replace(/\s+/g, '')
-      const name = resolveCharacter(data, nameInput) || resolveCharacter(data, compact)
+      const resolved = this.resolveNameCost(data, nameInput)
+      const compactResolved = resolved.name ? null : this.resolveNameCost(data, compact)
+      const name = resolved.name || compactResolved?.name
+      if (cost === null) cost = resolved.cost ?? compactResolved?.cost ?? null
       if (!name) {
         return this.reply([
           `没有识别到角色「${nameInput}」`,
@@ -374,16 +441,41 @@ export class Mhydps extends plugin {
   }
 
   /** #dps对比 玛薇卡 阿蕾奇诺 */
+  /** 把无空格的角色串拆成角色名，如「雷神龟」→ 雷神 / 龟 */
+  splitNames (data, text) {
+    const names = []
+    let rest = String(text ?? '').trim()
+    while (rest) {
+      let matched = null
+      for (let len = Math.min(6, rest.length); len >= 2; len--) {
+        const part = rest.slice(0, len)
+        const name = resolveCharacter(data, part)
+        if (name) {
+          matched = { name, len }
+          break
+        }
+      }
+      if (!matched) return null
+      names.push(matched.name)
+      rest = rest.slice(matched.len).replace(/^[\s,，、+＋]+/, '')
+    }
+    return names
+  }
+
   async compare () {
     return this.run(async () => {
       const { text, cleanOnly, forceText } = this.info
       const raw = (text.match(new RegExp(`${P}(?:对比|比较)[\\s:：]*(.+)$`, 'i'))?.[1] || '').trim()
-      const inputs = raw.split(/\s*(?:vs|VS|Vs)\s*|[\s,，、+＋]+/).filter(Boolean)
+      const data = await getData()
+      let inputs = raw.split(/\s*(?:vs|VS|Vs)\s*|[\s,，、+＋]+/).filter(Boolean)
+      if (inputs.length === 1) {
+        const split = this.splitNames(data, inputs[0])
+        if (split && split.length === 2) inputs = split
+      }
       if (inputs.length !== 2) {
         return this.reply('用法：#dps对比 玛薇卡 阿蕾奇诺\n一次对比两名角色的各金数DPS')
       }
 
-      const data = await getData()
       const nameA = resolveCharacter(data, inputs[0])
       const nameB = resolveCharacter(data, inputs[1])
       if (!nameA || !nameB) {
@@ -393,15 +485,39 @@ export class Mhydps extends plugin {
     })
   }
 
-  /** #dps队伍 玛薇卡 班尼特 */
+  /** #dps队伍 / #dps配队 玛薇卡 [N金] [页数] */
   async team () {
     return this.run(async () => {
       const { text, cleanOnly, forceText } = this.info
-      const raw = (text.match(new RegExp(`${P}队伍[\\s:：]*(.+)$`, 'i'))?.[1] || '').trim()
-      const inputs = raw.split(/[\s,，、+＋]+/).filter(Boolean).slice(0, 4)
-      if (!inputs.length) return this.reply('用法：#dps队伍 玛薇卡 班尼特')
+      let raw = (text.match(new RegExp(`${P}(?:队伍|配队)[\\s:：]*(.+)$`, 'i'))?.[1] || '').trim()
+      let maxCost = null
+      let page = 1
+
+      const costMatched = raw.match(/(\\d{1,2})\\s*金/)
+      if (costMatched) {
+        maxCost = Number(costMatched[1])
+        raw = raw.replace(costMatched[0], ' ')
+      }
+      const pageMatched = raw.match(/(?:第)?(\\d{1,2})\\s*页/)
+      if (pageMatched) {
+        page = Math.max(1, Number(pageMatched[1]))
+        raw = raw.replace(pageMatched[0], ' ')
+      } else if (maxCost !== null) {
+        const tail = raw.match(/(?:^|\\s)(\\d{1,2})\\s*$/)
+        if (tail) {
+          page = Math.max(1, Number(tail[1]))
+          raw = raw.slice(0, tail.index).trim()
+        }
+      }
 
       const data = await getData()
+      let inputs = raw.split(/[\\s,，、+＋]+/).filter(Boolean).slice(0, 4)
+      if (inputs.length === 1) {
+        const split = this.splitNames(data, inputs[0])
+        if (split && split.length > 1) inputs = split.slice(0, 4)
+      }
+      if (!inputs.length) return this.reply('用法：#dps配队 玛薇卡 8金 2')
+
       const names = []
       const unknown = []
       for (const input of inputs) {
@@ -411,7 +527,7 @@ export class Mhydps extends plugin {
       }
 
       if (unknown.length) return this.reply(`没有识别到角色：${unknown.join('、')}`)
-      return this.send(V.teamQueryView(data, names, { cleanOnly }), forceText)
+      return this.send(V.teamQueryView(data, names, { cleanOnly, maxCost, page }), forceText)
     })
   }
 
@@ -436,6 +552,68 @@ export class Mhydps extends plugin {
       if (matched?.[1] && cost === null) return this.reply('金数格式不对，例如：#dps危战金数 8')
       const data = await getStygian()
       return this.send(V.stygianCostView(data, cost, { cleanOnly }), forceText)
+    })
+  }
+
+  /** #dps危战列表 [版本] */
+  async stygianList () {
+    return this.run(async () => {
+      const { text, forceText } = this.info
+      const matched = text.match(new RegExp(`${P}危战列表(?:[\\s:：]*(\\d+(?:\\.\\d+)?))?\\s*$`, 'i'))
+      const data = await getStygian()
+      return this.send(V.stygianListView(data, matched?.[1] || ''), forceText)
+    })
+  }
+
+  /** #dps危战 低金：只看金数 ≤2 */
+  async stygianLow () {
+    return this.run(async () => {
+      const { forceText } = this.info
+      const data = await getStygian()
+      return this.send(V.stygianView(data, null, { maxCost: 2 }), forceText)
+    })
+  }
+
+  /** #dps危战 602：按 BOSS ID 过滤 */
+  async stygianBoss () {
+    return this.run(async () => {
+      const { text, forceText } = this.info
+      const boss = text.match(new RegExp(`${P}危战[\\s:：]*(\\d{1,4})\\s*$`, 'i'))?.[1]
+      const data = await getStygian()
+      return this.send(V.stygianView(data, null, { boss }), forceText)
+    })
+  }
+
+  /** #7.1危战第二间：版本 + 第几间 */
+  async stygianRoom () {
+    return this.run(async () => {
+      const { text, forceText } = this.info
+      const matched = text.match(new RegExp(`${P}(\\d+(?:\\.\\d+)?)危战第?([一二三四五1-5])间\\s*$`, 'i'))
+      if (!matched) return this.reply('用法：#7.1危战第二间')
+      const version = matched[1]
+      const roomMap = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5 }
+      const room = roomMap[matched[2]] || Number(matched[2])
+      const data = await getStygian()
+      const bosses = [...new Set(
+        (data.list || []).filter(item => String(item.ver) === String(version)).map(item => String(item.boss ?? ''))
+      )].filter(Boolean).sort((a, b) => Number(a) - Number(b))
+      const boss = bosses[room - 1]
+      if (!boss) {
+        return this.reply(`v${version} 只找到 ${bosses.length} 个 BOSS，没有第 ${room} 间`)
+      }
+      return this.send(V.stygianView(data, null, { version, boss }), forceText)
+    })
+  }
+
+  /** #dps视频 3：取榜单第 3 名的视频 */
+  async videoRank () {
+    return this.run(async () => {
+      const { text, forceText } = this.info
+      const rank = Number(text.match(new RegExp(`${P}视频[\\s:：]*(?:第)?(\\d{1,3})(?:名|号)?\\s*$`, 'i'))?.[1] || 0)
+      const data = await getData()
+      const view = V.videoRankView(data, rank)
+      if (!view) return this.reply('没有这个名次')
+      return this.send(view, forceText)
     })
   }
 
@@ -470,18 +648,82 @@ export class Mhydps extends plugin {
   }
 
   /** #dps 甘雨视频 [金数] [#序号] / #dps视频 甘雨 [金数] [#序号] */
+  /** 发送视频文件：优先复制进 NapCat 容器，容器读得到；否则退回 base64 */
+  async sendVideoFile (file, caption) {
+    const segment = globalThis.segment
+
+    if (process.platform === 'linux') {
+      try {
+        const { execFileSync } = await import('node:child_process')
+        const names = execFileSync('sudo', ['docker', 'ps', '--format', '{{.Names}}'], { encoding: 'utf8' })
+          .split('\n').map(s => s.trim()).filter(n => /napcat/i.test(n))
+        if (names.length) {
+          const name = `mhydps-${Date.now()}.mp4`
+          for (const container of names) {
+            execFileSync('sudo', ['docker', 'exec', container, 'mkdir', '-p', '/app/napcat/tmp'], { stdio: 'ignore' })
+            // 发之前先清掉 1 小时前的残留
+            execFileSync('sudo', ['docker', 'exec', container, 'sh', '-c', 'find /app/napcat/tmp -name "mhydps-*.mp4" -mmin +60 -delete'], { stdio: 'ignore' })
+            execFileSync('sudo', ['docker', 'cp', file, `${container}:/app/napcat/tmp/${name}`], { stdio: 'ignore' })
+          }
+          const inner = `file:///app/napcat/tmp/${name}`
+          const videoSeg = segment?.video ? segment.video(inner) : { type: 'video', file: inner }
+          const result = await this.reply([videoSeg, `\n${caption}`])
+
+          // 3 分钟后自动删除容器内的临时视频
+          const timer = setTimeout(() => {
+            for (const container of names) {
+              try {
+                execFileSync('sudo', ['docker', 'exec', container, 'rm', '-f', `/app/napcat/tmp/${name}`], { stdio: 'ignore' })
+              } catch (err) { /* 忽略清理失败 */ }
+            }
+          }, 180000)
+          timer.unref?.()
+          return result
+        }
+      } catch (err) {
+        globalThis.logger?.warn?.(`[mhydps-plugin] 容器内发送失败，改用 base64：${err.message}`)
+      }
+    }
+
+    const buffer = fs.readFileSync(file)
+    const videoSeg = segment?.video ? segment.video(`base64://${buffer.toString('base64')}`) : { type: 'video', file: buffer }
+    return this.reply([videoSeg, `\n${caption}`])
+  }
+
   async video () {
     return this.run(async () => {
       const { text, cleanOnly, forceText } = this.info
 
-      // 序号：#2 / 第2 / 2号
       let working = text
+
+      // 序号：#2 / 第2 / 2号
       let index = null
       const indexMatch = working.match(/[\s:：]*(?:#|第)(\d{1,2})号?\s*$/i) ||
         working.match(/[\s:：]*(\d{1,2})号\s*$/i)
       if (indexMatch) {
         index = Number(indexMatch[1])
         working = working.slice(0, indexMatch.index).trim()
+      }
+
+      // 下载意图：#dps 甘雨 8金视频 下载 / #dps视频下载 甘雨 8金
+      let wantDownload = false
+      if (/视频[\s:：]*下载/.test(working)) {
+        wantDownload = true
+        working = working.replace(/视频[\s:：]*下载/, '视频')
+      }
+      if (/[\s:：]*下载\s*$/.test(working)) {
+        wantDownload = true
+        working = working.replace(/[\s:：]*下载\s*$/, '').trim()
+      }
+
+      // 序号写在「下载」前面的情况：#dps 甘雨 8金视频 #2 下载
+      if (index === null) {
+        const late = working.match(/[\s:：]*(?:#|第)(\d{1,2})号?\s*$/i) ||
+          working.match(/[\s:：]*(\d{1,2})号\s*$/i)
+        if (late) {
+          index = Number(late[1])
+          working = working.slice(0, late.index).trim()
+        }
       }
 
       let raw = ''
@@ -506,6 +748,24 @@ export class Mhydps extends plugin {
         return this.reply('用法：#dps 甘雨视频 [金数] [#序号]\n例：#dps 甘雨视频 或 #dps视频 甘雨 4 #2')
       }
 
+      // 支持「#dps雷神 8金视频」「#dps雷神8金视频」这种把金数写在角色后面的形式
+      if (!costRaw) {
+        const attached = raw.match(/^(.*?)[\s:：]*(\d{1,2}|满配|满金)金$/)
+        if (attached && attached[1].trim()) {
+          raw = attached[1].trim()
+          costRaw = attached[2]
+        }
+      }
+
+      // 支持「#dps视频木偶17#2」：角色名后直接跟金数，没有「金」字
+      if (!costRaw) {
+        const digits = raw.match(/^(.*?)(\d{1,2})$/)
+        if (digits && digits[1].trim() && this.parseCost(digits[2]) !== null) {
+          raw = digits[1].trim()
+          costRaw = digits[2]
+        }
+      }
+
       const cost = costRaw ? this.parseCost(costRaw) : null
       if (costRaw && cost === null) return this.reply('金数格式不对，例如：#dps 甘雨视频 4')
 
@@ -525,6 +785,35 @@ export class Mhydps extends plugin {
       }
 
       const total = rows.length
+
+      if (wantDownload) {
+        const pick = index ?? 1
+        if (!Number.isInteger(pick) || pick < 1 || pick > total) {
+          return this.reply(`序号超出范围：共 ${total} 条，可用 #1 ~ #${total}`)
+        }
+        if (config.videoDownload === false) {
+          return this.reply('视频发送功能已关闭，可在 config/config.js 打开 videoDownload')
+        }
+        if (config.videoDownloadMasterOnly !== false && !this.e.isMaster) {
+          return this.reply('只有机器人主人才能让机器人发送视频文件哦~')
+        }
+
+        const team = rows[pick - 1]
+        await this.reply(`正在下载第 ${pick} 条视频，约 10~30 秒…`)
+
+        const result = await downloadVideo(team.video, {
+          qn: config.videoQuality,
+          maxMB: config.videoMaxMB
+        })
+        cleanupFile(result.file)
+
+        const caption = [
+          result.title || `${name} 视频`,
+          result.bvid ? `https://www.bilibili.com/video/${result.bvid}` : ''
+        ].filter(Boolean).join('\n')
+
+        return this.sendVideoFile(result.file, caption)
+      }
 
       if (index !== null) {
         if (!Number.isInteger(index) || index < 1 || index > total) {
@@ -592,18 +881,12 @@ export class Mhydps extends plugin {
       })
       cleanupFile(result.file)
 
-      const segment = globalThis.segment
-      const videoSeg = segment?.video ? segment.video(result.file) : { type: 'video', file: result.file }
       const caption = [
         result.title || `${name} 视频`,
         result.bvid ? `https://www.bilibili.com/video/${result.bvid}` : ''
       ].filter(Boolean).join('\n')
 
-      try {
-        return await this.reply([videoSeg, `\n${caption}`])
-      } catch (err) {
-        return this.reply(`视频发送失败：${err.message}\n${caption}`)
-      }
+      return this.sendVideoFile(result.file, caption)
     })
   }
 }

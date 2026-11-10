@@ -48,6 +48,13 @@ export const config = {
   /** 视频文件大小上限（MB），超过会拒绝下载 */
   videoMaxMB: 30,
 
+  /**
+   * B 站登录 Cookie（可选）
+   * 填了之后视频查询/下载都用你的账号，412 更少，也能拿更高清晰度
+   * 格式：SESSDATA=xxx; bili_jct=xxx; DedeUserID=xxx
+   */
+  biliCookie: 'SESSDATA=12917176%2C1809753792%2C14b99%2Ab2CjCSW6AMp5-jhaq8E9QfA40JvOjVe7tfHbU-WrKFYkv99AraUEde8cdCRHF3D2hyP3USVmpkUWhRWWc0aThrcFJMRnp1ZXZKRVZobHJxZUVudk5rUHhibDlYTmU3LS1YdUxKdjNXT3paNWthSTNsWFJ1LS1ZVkp0TnBBMktiRXpxdG5MQ2p2cHJRIIEC',
+
   /** 卡片上是否显示角色头像（取自站点，加载失败自动用首字占位） */
   avatar: true,
 
