@@ -300,6 +300,16 @@ function starBadge (tags) {
   return `<span class="sstar" title="命星">${STAR_ICON}</span>`
 }
 
+
+
+function tagBadges (tags) {
+  const list = Array.isArray(tags) ? tags : []
+  const out = []
+  if (list.includes('绿玩')) out.push('<i class="stag green">绿玩</i>')
+  if (list.includes('宏')) out.push('<i class="stag red">宏</i>')
+  return out.join('')
+}
+
 function stygianRowHtml (item, avatars) {
   const members = (item.members || []).map(m => {
     const cons = m.cons > 0 ? `<em>${m.cons}</em>` : ''
@@ -310,7 +320,7 @@ function stygianRowHtml (item, avatars) {
   }).join('')
   const star = starBadge(item.tags)
   const costLabel = item.costText || item.cost?.label
-  const cost = costLabel ? `<b>${esc(costLabel)}${star}</b><span>金数</span>` : ''
+  const cost = costLabel ? `<b>${esc(costLabel)}${star}</b><span>金数</span>${tagBadges(item.tags)}` : ''
   const time = item.value ? `<b>${esc(item.value)}</b><span>用时</span>` : ''
   const href = item.video || (item.link ? `https://www.bilibili.com/video/${item.link}` : '')
   const play = href
@@ -340,7 +350,7 @@ function dpsRowHtml (item, avatars) {
       </div>`
   const star = starBadge(item.tags)
   const costLabel = item.costText || item.cost?.label
-  const cost = costLabel ? `<b>${esc(costLabel)}${star}</b><span>金数</span>` : ''
+  const cost = costLabel ? `<b>${esc(costLabel)}${star}</b><span>金数</span>${tagBadges(item.tags)}` : ''
   const value = item.value ? `<b class="dps">${esc(item.value)}</b><span>DPS</span>` : ''
   const href = item.video || (item.link ? `https://www.bilibili.com/video/${item.link}` : '')
   const play = href
@@ -382,7 +392,7 @@ function sectionHtml (section, avatars, weaponIcons = new Map(), layout = '') {
 
   if (section.type === 'tiers') {
     const rows = section.items.map(item => `<div class="tier">
-      <div class="tier-cost">${costPill(item.cost)}${starBadge(item.tags)}</div>
+      <div class="tier-cost">${costPill(item.cost)}${starBadge(item.tags)}${tagBadges(item.tags)}</div>
       <div class="tier-dps">${esc(item.value)}</div>
       <div class="tier-team"><div class="members">${membersHtml(item.members, avatars)}</div></div>
       ${item.count ? `<div class="tier-count">${esc(item.count)}${item.median ? `<span>中位 ${esc(item.median)}</span>` : ''}</div>` : ''}
@@ -512,6 +522,9 @@ const LIGHT_CSS = `
 .scost span, .stime span { font-size: 9.5px; color: #9aa3b6; }
 .sstar { display: inline-flex; width: 16px; height: 16px; margin-left: 3px; vertical-align: -3px; }
 .sstar img { width: 16px; height: 16px; display: block; object-fit: contain; }
+.stag { display: inline-block; font-style: normal; font-size: 9px; line-height: 13px; padding: 0 4px; border-radius: 4px; margin: 2px 2px 0 0; }
+.stag.green { color: #3f9b5c; background: #e3f6e8; }
+.stag.red { color: #c94f4f; background: #fdeaea; }
 .splay {
   flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%;
   background: #2f8ef0; color: #fff; font-size: 12px; line-height: 30px; text-align: center;
