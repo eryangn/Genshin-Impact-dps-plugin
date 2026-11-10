@@ -318,6 +318,35 @@ function stygianRowHtml (item, avatars) {
   </div>`
 }
 
+function dpsRowHtml (item, avatars) {
+  const members = item.members?.length
+    ? item.members.map(m => {
+      const cons = m.cons > 0 ? `<em>${m.cons}</em>` : ''
+      return `<div class="smember">
+        <span class="sava-wrap">${avatarHtml(m.name, avatars, 'sava')}${cons}</span>
+        <span class="sname">${esc(m.name)}</span>
+      </div>`
+    }).join('')
+    : `<div class="smember">
+        <span class="sava-wrap">${avatarHtml(item.name, avatars, 'sava')}</span>
+        <span class="sname">${esc(item.name)}</span>
+      </div>`
+  const costLabel = item.costText || item.cost?.label
+  const cost = costLabel ? `<b>${esc(costLabel)}</b><span>金数</span>` : ''
+  const value = item.value ? `<b class="dps">${esc(item.value)}</b><span>DPS</span>` : ''
+  const href = item.video || (item.link ? `https://www.bilibili.com/video/${item.link}` : '')
+  const play = href
+    ? `<a class="splay" href="${esc(href)}">▶</a>`
+    : '<span class="splay empty"></span>'
+  return `<div class="srow">
+    <div class="srank ${item.rank <= 3 ? '' : 'n'}">${esc(item.rank)}</div>
+    <div class="smembers">${members}</div>
+    <div class="scost">${cost}</div>
+    <div class="stime">${value}</div>
+    ${play}
+  </div>`
+}
+
 function sectionHtml (section, avatars, weaponIcons = new Map(), layout = '') {
   if (section.type === 'curve') {
     const tiles = section.items.map(item => `<div class="tile">
@@ -330,6 +359,9 @@ function sectionHtml (section, avatars, weaponIcons = new Map(), layout = '') {
   if (section.type === 'rows') {
     if (layout === 'stygian') {
       return `<section class="stygian">${section.items.map(item => stygianRowHtml(item, avatars)).join('')}</section>`
+    }
+    if (layout === 'dps') {
+      return `<section class="stygian">${section.items.map(item => dpsRowHtml(item, avatars)).join('')}</section>`
     }
     return `<section>${section.title ? `<h2>${esc(section.title)}</h2>` : ''}${section.items.map(item => rowHtml(item, avatars)).join('')}</section>`
   }
@@ -481,12 +513,26 @@ const LIGHT_CSS = `
 .card.light .foot { border-top: none; justify-content: center; color: #a2aabb; font-size: 10.5px; margin-top: 10px; }
 .card.light .notes { color: #9aa3b6; text-align: center; }
 .card.light .notes div { display: inline-block; margin: 0 6px; }
+.card.light table th { color: #8a93a8; border-color: #e4e9f3; }
+.card.light table td { color: #3a4358; border-color: #e4e9f3; }
+.card.light table td:first-child { color: #3f7fd9; }
+.card.light .tier { border-color: #e4e9f3; }
+.card.light .tier-dps { color: #e0a52e; }
+.card.light .tier-team .member { color: #3a4358; }
+.card.light .tier-team .member em { color: #7b86a0; }
+.card.light .pill { color: #b98418; background: #fff5dd; border-color: #f0d79a; }
+.card.light .pill em { color: #a98f5e; }
+.card.light .note { color: #4a5468; }
+.card.light .pairs .k, .card.light .pair .k { color: #8a93a8; }
+.card.light .srow .dps { color: #d9633f; }
 `
 
 export function toHtml (view, avatars = new Map(), weaponIcons = new Map()) {
   const width = Math.max(360, Number(view.width) || Number(config.imageWidth) || 720)
+  const light = view.theme === 'light' || (!view.help && !view.avatarName && /排行|榜|配队|金数/.test(String(view.title || '')))
+  const layout = view.layout || (light ? 'dps' : '')
   const stats = view.stats?.length ? `<div class="stats">${view.stats.map(statHtml).join('')}</div>` : ''
-  const sections = (view.sections || []).map(section => sectionHtml(section, avatars, weaponIcons, view.layout || '')).join('')
+  const sections = (view.sections || []).map(section => sectionHtml(section, avatars, weaponIcons, layout)).join('')
   const notes = view.notes?.length
     ? `<div class="notes">${view.notes.map(note => `<div>· ${esc(note)}</div>`).join('')}</div>`
     : ''
@@ -500,8 +546,8 @@ export function toHtml (view, avatars = new Map(), weaponIcons = new Map()) {
     ? `<div class="hero"><img class="hero-avatar" src="${heroAvatar}" alt=""><div class="hero-text"><h1>${esc(view.title)}</h1>${sub}</div></div>`
     : `<h1>${esc(view.title)}</h1>${sub}`
 
-  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><style>${CSS}${view.theme === 'light' ? LIGHT_CSS : ''}</style></head>
-<body style="width:${width}px"><div class="card${view.help ? ' help-mode' : ''}${view.theme === 'light' ? ' light' : ''}">
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><style>${CSS}${light ? LIGHT_CSS : ''}</style></head>
+<body style="width:${width}px"><div class="card${view.help ? ' help-mode' : ''}${light ? ' light' : ''}">
   <div class="top"><div class="brand">MHYDPS.CN<span>原神 DPS 数据库</span></div><div class="dot"></div></div>
   ${titleBlock}
   ${stats}
